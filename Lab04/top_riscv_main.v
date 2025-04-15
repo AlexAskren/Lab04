@@ -1,4 +1,4 @@
-// Complete top-level pipelined RISC-V module
+// ✅ FIXED: top_riscv_main.v (renamed for clarity to top_pipelined_riscv.v)
 module top_pipelined_riscv (
     input wire clk,
     input wire reset
@@ -30,19 +30,16 @@ module top_pipelined_riscv (
     reg [4:0]  MEM_WB_rd;
     reg        MEM_WB_RegWrite, MEM_WB_MemToReg;
 
-    // Control signals
     wire RegWrite, MemRead, MemWrite, ALUSrc, Branch, MemToReg;
     wire [1:0] ALUOp;
     wire hazard_stall, PCWrite, IF_ID_Write;
 
-    // Instruction Decode
     wire [6:0] opcode = IF_ID_instr[6:0];
     wire [4:0] rs1 = IF_ID_instr[19:15];
     wire [4:0] rs2 = IF_ID_instr[24:20];
     wire [4:0] rd  = IF_ID_instr[11:7];
     wire [31:0] imm = {{20{IF_ID_instr[31]}}, IF_ID_instr[31:20]};
 
-    // Forwarding Unit
     wire [1:0] ForwardA, ForwardB;
     forwarding_unit FU (
         .ID_EX_Rs1(ID_EX_rs1),
@@ -55,7 +52,6 @@ module top_pipelined_riscv (
         .ForwardB(ForwardB)
     );
 
-    // ALU inputs with forwarding
     wire [31:0] ALU_input_A = (ForwardA == 2'b10) ? EX_MEM_ALU_result :
                               (ForwardA == 2'b01) ? (MEM_WB_MemToReg ? MEM_WB_read_data : MEM_WB_ALU_result) :
                               ID_EX_RD1;
@@ -126,6 +122,7 @@ module top_pipelined_riscv (
     register_file RF (
         .clk(clk),
         .rst(reset),
+        .stall(hazard_stall),
         .A1(rs1),
         .A2(rs2),
         .A3(MEM_WB_rd),
@@ -153,7 +150,6 @@ module top_pipelined_riscv (
             PC <= next_PC;
     end
 
-    // IF/ID pipeline register
     always @(posedge clk) begin
         if (reset) begin
             IF_ID_instr <= 0;
@@ -164,7 +160,6 @@ module top_pipelined_riscv (
         end
     end
 
-    // ID/EX pipeline register
     always @(posedge clk) begin
         if (reset || hazard_stall) begin
             ID_EX_RegWrite <= 0;
@@ -188,7 +183,6 @@ module top_pipelined_riscv (
         end
     end
 
-    // EX/MEM pipeline register
     always @(posedge clk) begin
         if (reset) begin
             EX_MEM_ALU_result <= 0;
@@ -209,7 +203,6 @@ module top_pipelined_riscv (
         end
     end
 
-    // MEM/WB pipeline register
     always @(posedge clk) begin
         if (reset) begin
             MEM_WB_read_data <= 0;

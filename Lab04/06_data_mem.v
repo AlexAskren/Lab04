@@ -1,3 +1,4 @@
+// Updated Full Data Memory Module with Word-Aligned Access and Debugging
 module mem_data #(
     parameter DATA_WIDTH = 32,
     parameter ADDR_WIDTH = 32,
@@ -27,20 +28,28 @@ module mem_data #(
             dout <= 0;
         end else begin
             // Write operation to data memory region (second half)
-            if (wr_en && word_addr >= (MEM_DEPTH/2) && word_addr < MEM_DEPTH) begin
+            if (wr_en && word_addr >= MEM_DEPTH/2 && word_addr < MEM_DEPTH) begin
                 memory[word_addr] <= din;
-                $display("[WRITE] Addr=0x%08h (word=%0d), Data=0x%08h", addr, word_addr, din);
+                $display("[WRITE] Addr=0x%08h, Word Addr=%0d, Data=0x%08h", addr, word_addr, din);
             end
 
             // Read operation from data memory region
-            if (rd_en && word_addr >= (MEM_DEPTH/2) && word_addr < MEM_DEPTH) begin
+            if (rd_en && word_addr >= MEM_DEPTH/2 && word_addr < MEM_DEPTH) begin
                 dout <= memory[word_addr];
-                $display("[READ] Addr=0x%08h (word=%0d), Data=0x%08h", addr, word_addr, memory[word_addr]);
+                $display("[READ] Addr=0x%08h, Word Addr=%0d, Data=0x%08h", addr, word_addr, memory[word_addr]);
             end else if (rd_en) begin
                 dout <= 0;
                 $display("[READ BLOCKED] Invalid Addr=0x%08h (word=%0d)", addr, word_addr);
             end
         end
+    end
+
+    // Debug display for any memory access attempts
+    always @(posedge clk) begin
+        if (wr_en)
+            $display("[WRITE-CYCLE] clk=%0t | addr=%h | word_addr=%0d | din=%h", $time, addr, word_addr, din);
+        if (rd_en)
+            $display("[READ-CYCLE] clk=%0t | addr=%h | word_addr=%0d | dout=%h", $time, addr, word_addr, dout);
     end
 
     // Optional memory dump after 1000 ns

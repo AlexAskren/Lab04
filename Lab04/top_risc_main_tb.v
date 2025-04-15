@@ -1,40 +1,33 @@
+// Testbench for top_pipelined_riscv
 `timescale 1ns / 1ps
 
 module tb_top_pipelined_riscv;
-
     reg clk;
     reg reset;
 
-    // Instantiate the DUT (Design Under Test)
+    // Instantiate the DUT
     top_pipelined_riscv dut (
         .clk(clk),
         .reset(reset)
     );
 
-    // Clock generation: 10ns period
-    always begin
-        #5 clk = ~clk;
-    end
+    // Clock generation
+    always #5 clk = ~clk;  // 10ns period
 
-    // Test sequence
+    // Initial setup
     initial begin
-        $display("Starting pipelined RISC-V simulation...");
+        $dumpfile("waveform.vcd");
+        $dumpvars(0, tb_top_pipelined_riscv);
+
         clk = 0;
         reset = 1;
         #20;
         reset = 0;
 
-        // Let it run long enough to execute a program
+        // Run long enough to process instructions
         #1000;
 
-        $display("Simulation complete.");
+        $display("Simulation completed.");
         $finish;
     end
-
-    // Dump waveform
-    initial begin
-        $dumpfile("wave.vcd");
-        $dumpvars(0, tb_top_pipelined_riscv);
-    end
-
 endmodule
