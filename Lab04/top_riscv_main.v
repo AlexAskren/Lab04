@@ -1,4 +1,3 @@
-// ✅ FIXED: top_riscv_main.v (renamed for clarity to top_pipelined_riscv.v)
 module top_pipelined_riscv (
     input wire clk,
     input wire reset
@@ -19,6 +18,8 @@ module top_pipelined_riscv (
     reg [1:0]  ID_EX_ALUOp;
     reg        ID_EX_ALUSrc, ID_EX_MemRead, ID_EX_MemWrite;
     reg        ID_EX_RegWrite, ID_EX_MemToReg;
+    reg [2:0]  ID_EX_funct3;
+    reg        ID_EX_funct7_bit;
 
     // EX/MEM pipeline registers
     reg [31:0] EX_MEM_ALU_result, EX_MEM_RD2;
@@ -64,10 +65,9 @@ module top_pipelined_riscv (
 
     wire [4:0] ALU_ctrl;
     alu_control ALU_CTRL (
-        .clk(clk),
-        .reset(reset),
         .ALUOp(ID_EX_ALUOp),
-        .instr(IF_ID_instr),
+        .funct3(ID_EX_funct3),
+        .funct7_bit(ID_EX_funct7_bit),
         .ALUControl(ALU_ctrl)
     );
 
@@ -82,10 +82,7 @@ module top_pipelined_riscv (
         .ALU_inb_imm(ID_EX_imm),
         .ALUSrc(ID_EX_ALUSrc),
         .ALU_out(ALU_result),
-        .Zero_flag(Zero_flag),
-        .Negative_flag(),
-        .Carry_flag(),
-        .Overflow_flag()
+        .Zero_flag(Zero_flag)
     );
 
     wire [31:0] DataMemOut;
@@ -99,7 +96,7 @@ module top_pipelined_riscv (
         .dout(DataMemOut)
     );
 
-    instr_mem IMEM (
+    instr_mem #(.MEM_DEPTH(2048)) IMEM (
         .clk(clk),
         .reset(reset),
         .addr(PC),
@@ -142,81 +139,102 @@ module top_pipelined_riscv (
         .IF_ID_Write(IF_ID_Write)
     );
 
+    always @(posedge clk or posedge reset)
+        PC <= (reset) ? 32'b0 : (PCWrite) ? next_PC : PC;
+
     assign next_PC = PC + 4;
-    always @(posedge clk or posedge reset) begin
-        if (reset)
-            PC <= 0;
-        else if (PCWrite)
-            PC <= next_PC;
-    end
 
-    always @(posedge clk) begin
-        if (reset) begin
-            IF_ID_instr <= 0;
-            IF_ID_PC    <= 0;
-        end else if (IF_ID_Write) begin
-            IF_ID_instr <= instr;
-            IF_ID_PC    <= PC;
-        end
+    // pipeline register updates as provided earlier in corrected form...
+    // IF_ID pipeline register update
+always @(posedge clk) begin
+    if (reset) begin
+        IF_ID_instr <= 32'b0;
+        IF_ID_PC    <= 32'b0;
+    end else if (IF_ID_Write) begin
+        IF_ID_instr <= instr;
+        IF_ID_PC    <= PC;
     end
+end
 
-    always @(posedge clk) begin
-        if (reset || hazard_stall) begin
-            ID_EX_RegWrite <= 0;
-            ID_EX_MemRead  <= 0;
-            ID_EX_MemWrite <= 0;
-            ID_EX_ALUSrc   <= 0;
-            ID_EX_ALUOp    <= 2'b00;
-        end else begin
-            ID_EX_RD1      <= RD1;
-            ID_EX_RD2      <= RD2;
-            ID_EX_imm      <= imm;
-            ID_EX_rs1      <= rs1;
-            ID_EX_rs2      <= rs2;
-            ID_EX_rd       <= rd;
-            ID_EX_RegWrite <= RegWrite;
-            ID_EX_MemRead  <= MemRead;
-            ID_EX_MemWrite <= MemWrite;
-            ID_EX_ALUSrc   <= ALUSrc;
-            ID_EX_ALUOp    <= ALUOp;
-            ID_EX_MemToReg <= MemToReg;
-        end
+// ID_EX pipeline register update (Exactly ONCE)
+always @(posedge clk) begin
+    if (reset || hazard_stall) begin
+        ID_EX_RD1       <= 32'b0;
+        ID_EX_RD2       <= 32'b0;
+        ID_EX_imm       <= 32'b0;
+        ID_EX_rs1       <= 5'b0;
+        ID_EX_rs2       <= 5'b0;
+        ID_EX_rd        <= 5'b0;
+        ID_EX_RegWrite  <= 1'b0;
+        ID_EX_MemRead   <= 1'b0;
+        ID_EX_MemWrite  <= 1'b0;
+        ID_EX_ALUSrc    <= 1'b0;
+        ID_EX_ALUOp     <= 2'b00;
+        ID_EX_MemToReg  <= 1'b0;
+        ID_EX_funct3    <= 3'b000;
+        ID_EX_funct7_bit<= 1'b0;
+    end else begin
+        ID_EX_RD1       <= RD1;
+        ID_EX_RD2       <= RD2;
+        ID_EX_imm       <= imm;
+        ID_EX_rs1       <= rs1;
+        ID_EX_rs2       <= rs2;
+        ID_EX_rd        <= rd;
+        ID_EX_RegWrite  <= RegWrite;
+        ID_EX_MemRead   <= MemRead;
+        ID_EX_MemWrite  <= MemWrite;
+        ID_EX_ALUSrc    <= ALUSrc;
+        ID_EX_ALUOp     <= ALUOp;
+        ID_EX_MemToReg  <= MemToReg;
+        ID_EX_funct3    <= IF_ID_instr[14:12];
+        ID_EX_funct7_bit<= IF_ID_instr[30];
     end
+end
 
-    always @(posedge clk) begin
-        if (reset) begin
-            EX_MEM_ALU_result <= 0;
-            EX_MEM_RD2        <= 0;
-            EX_MEM_rd         <= 0;
-            EX_MEM_RegWrite   <= 0;
-            EX_MEM_MemRead    <= 0;
-            EX_MEM_MemWrite   <= 0;
-            EX_MEM_MemToReg   <= 0;
-        end else begin
-            EX_MEM_ALU_result <= ALU_result;
-            EX_MEM_RD2        <= ALU_input_B_raw;
-            EX_MEM_rd         <= ID_EX_rd;
-            EX_MEM_RegWrite   <= ID_EX_RegWrite;
-            EX_MEM_MemRead    <= ID_EX_MemRead;
-            EX_MEM_MemWrite   <= ID_EX_MemWrite;
-            EX_MEM_MemToReg   <= ID_EX_MemToReg;
-        end
+// EX_MEM pipeline register update
+always @(posedge clk) begin
+    if (reset) begin
+        EX_MEM_ALU_result <= 32'b0;
+        EX_MEM_RD2        <= 32'b0;
+        EX_MEM_rd         <= 5'b0;
+        EX_MEM_RegWrite   <= 1'b0;
+        EX_MEM_MemRead    <= 1'b0;
+        EX_MEM_MemWrite   <= 1'b0;
+        EX_MEM_MemToReg   <= 1'b0;
+    end else begin
+        EX_MEM_ALU_result <= ALU_result;
+        EX_MEM_RD2        <= ALU_input_B_raw;
+        EX_MEM_rd         <= ID_EX_rd;
+        EX_MEM_RegWrite   <= ID_EX_RegWrite;
+        EX_MEM_MemRead    <= ID_EX_MemRead;
+        EX_MEM_MemWrite   <= ID_EX_MemWrite;
+        EX_MEM_MemToReg   <= ID_EX_MemToReg;
     end
+end
 
-    always @(posedge clk) begin
-        if (reset) begin
-            MEM_WB_read_data <= 0;
-            MEM_WB_ALU_result <= 0;
-            MEM_WB_rd <= 0;
-            MEM_WB_RegWrite <= 0;
-            MEM_WB_MemToReg <= 0;
-        end else begin
-            MEM_WB_read_data <= DataMemOut;
-            MEM_WB_ALU_result <= EX_MEM_ALU_result;
-            MEM_WB_rd <= EX_MEM_rd;
-            MEM_WB_RegWrite <= EX_MEM_RegWrite;
-            MEM_WB_MemToReg <= EX_MEM_MemToReg;
-        end
+// MEM_WB pipeline register update
+always @(posedge clk) begin
+    if (reset) begin
+        MEM_WB_read_data  <= 32'b0;
+        MEM_WB_ALU_result <= 32'b0;
+        MEM_WB_rd         <= 5'b0;
+        MEM_WB_RegWrite   <= 1'b0;
+        MEM_WB_MemToReg   <= 1'b0;
+    end else begin
+        MEM_WB_read_data  <= DataMemOut;
+        MEM_WB_ALU_result <= EX_MEM_ALU_result;
+        MEM_WB_rd         <= EX_MEM_rd;
+        MEM_WB_RegWrite   <= EX_MEM_RegWrite;
+        MEM_WB_MemToReg   <= EX_MEM_MemToReg;
     end
+end
+
+
+
+// Debugging display (optional but recommended)
+always @(posedge clk) begin
+    $display("[FORWARD DEBUG] EX_MEM_RegWrite=%b, EX_MEM_Rd=%d, MEM_WB_RegWrite=%b, MEM_WB_Rd=%d, ID_EX_Rs1=%d, ID_EX_Rs2=%d", 
+        EX_MEM_RegWrite, EX_MEM_rd, MEM_WB_RegWrite, MEM_WB_rd, ID_EX_rs1, ID_EX_rs2);
+end
 
 endmodule

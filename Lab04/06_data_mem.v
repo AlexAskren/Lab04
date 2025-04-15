@@ -21,19 +21,21 @@ module mem_data #(
 
     integer i;
 
+    // Explicitly initialize memory to zero
+    initial begin
+        for (i = 0; i < MEM_DEPTH; i = i + 1)
+            memory[i] = 32'b0;
+    end
+
     always @(posedge clk or posedge reset) begin
         if (reset) begin
-            for (i = MEM_DEPTH/2; i < MEM_DEPTH; i = i + 1)
-                memory[i] <= 0;
             dout <= 0;
         end else begin
-            // Write operation to data memory region (second half)
             if (wr_en && word_addr >= MEM_DEPTH/2 && word_addr < MEM_DEPTH) begin
                 memory[word_addr] <= din;
                 $display("[WRITE] Addr=0x%08h, Word Addr=%0d, Data=0x%08h", addr, word_addr, din);
             end
 
-            // Read operation from data memory region
             if (rd_en && word_addr >= MEM_DEPTH/2 && word_addr < MEM_DEPTH) begin
                 dout <= memory[word_addr];
                 $display("[READ] Addr=0x%08h, Word Addr=%0d, Data=0x%08h", addr, word_addr, memory[word_addr]);
@@ -50,6 +52,9 @@ module mem_data #(
             $display("[WRITE-CYCLE] clk=%0t | addr=%h | word_addr=%0d | din=%h", $time, addr, word_addr, din);
         if (rd_en)
             $display("[READ-CYCLE] clk=%0t | addr=%h | word_addr=%0d | dout=%h", $time, addr, word_addr, dout);
+
+        $display("[MEM DEBUG] Time=%t Addr=%h Read=%b Write=%b Dout=%h Din=%h", 
+            $time, addr, rd_en, wr_en, dout, din);
     end
 
     // Optional memory dump after 1000 ns
