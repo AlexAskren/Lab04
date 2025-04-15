@@ -58,7 +58,7 @@ module control_unit (
                     MemToReg = 0; // Don't care
                     ALUOp    = 2'b01;
                 end
-                7'b0010011: begin // I-type: Arithmetic immediate
+                7'b0010011: begin // I-type: Arithmetic immediate (e.g., addi)
                     RegWrite = 1;
                     MemRead  = 0;
                     MemWrite = 0;
@@ -68,6 +68,24 @@ module control_unit (
                     ALUOp    = 2'b10;
                 end
                 7'b1101111: begin // J-type: JAL
+                    RegWrite = 1;
+                    MemRead  = 0;
+                    MemWrite = 0;
+                    ALUSrc   = 1;
+                    Branch   = 0;
+                    MemToReg = 0;
+                    ALUOp    = 2'b00;
+                end
+                7'b0110111: begin // U-type: LUI
+                    RegWrite = 1;
+                    MemRead  = 0;
+                    MemWrite = 0;
+                    ALUSrc   = 1;     // Use immediate
+                    Branch   = 0;
+                    MemToReg = 0;
+                    ALUOp    = 2'b00; // Just pass imm through ALU
+                end
+                7'b0010111: begin // U-type: AUIPC
                     RegWrite = 1;
                     MemRead  = 0;
                     MemWrite = 0;

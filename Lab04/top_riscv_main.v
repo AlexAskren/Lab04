@@ -51,7 +51,14 @@ module top_pipelined_riscv (
     wire [4:0] rs1 = IF_ID_instr[19:15];
     wire [4:0] rs2 = IF_ID_instr[24:20];
     wire [4:0] rd  = IF_ID_instr[11:7];
-    wire [31:0] imm = {{20{IF_ID_instr[31]}}, IF_ID_instr[31:20]};
+    wire [31:0] imm_i = {{20{IF_ID_instr[31]}}, IF_ID_instr[31:20]}; // I-type
+    wire [31:0] imm_u = {IF_ID_instr[31:12], 12'b0};                 // U-type (LUI, AUIPC)
+    wire [31:0] imm_b = {{20{IF_ID_instr[31]}}, IF_ID_instr[7], IF_ID_instr[30:25], IF_ID_instr[11:8], 1'b0}; // B-type
+    
+    wire [31:0] imm = (opcode == 7'b0110111 || opcode == 7'b0010111) ? imm_u :  // LUI, AUIPC
+                      (opcode == 7'b1100011) ? imm_b :                          // BEQ, BNE, etc.
+                      imm_i;                                                   // Default I-type
+    
 
     wire [1:0] ForwardA, ForwardB;
     wire branch_predict;
@@ -75,9 +82,10 @@ module top_pipelined_riscv (
     wire [31:0] ALU_input_B_raw = (ForwardB == 2'b10) ? EX_MEM_ALU_result :
                                   (ForwardB == 2'b01) ? (MEM_WB_MemToReg ? MEM_WB_read_data : MEM_WB_ALU_result) :
                                   ID_EX_RD2;
-
+    
     wire [31:0] ALU_input_B = (ID_EX_ALUSrc) ? ID_EX_imm : ALU_input_B_raw;
-
+    
+    
     wire [4:0] ALU_ctrl;
     alu_control ALU_CTRL (
         .ALUOp(ID_EX_ALUOp),
