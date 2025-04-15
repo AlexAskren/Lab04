@@ -30,6 +30,18 @@ module top_pipelined_riscv (
     reg [31:0] MEM_WB_read_data, MEM_WB_ALU_result;
     reg [4:0]  MEM_WB_rd;
     reg        MEM_WB_RegWrite, MEM_WB_MemToReg;
+    
+        // IF_ID stage
+    reg IF_ID_branch_predict;
+    
+    // ID_EX stage
+    reg ID_EX_branch_predict;
+    reg ID_EX_Branch; // Branch signal from control unit
+    
+    // EX_MEM stage
+    reg EX_MEM_branch_taken;
+    reg EX_MEM_Branch;
+    reg EX_MEM_predicted_taken;
 
     wire RegWrite, MemRead, MemWrite, ALUSrc, Branch, MemToReg;
     wire [1:0] ALUOp;
@@ -42,6 +54,9 @@ module top_pipelined_riscv (
     wire [31:0] imm = {{20{IF_ID_instr[31]}}, IF_ID_instr[31:20]};
 
     wire [1:0] ForwardA, ForwardB;
+    wire branch_predict;
+    wire flush_IF_ID, flush_ID_EX, flush_EX_MEM;
+    
     forwarding_unit FU (
         .ID_EX_Rs1(ID_EX_rs1),
         .ID_EX_Rs2(ID_EX_rs2),
@@ -139,82 +154,106 @@ module top_pipelined_riscv (
         .IF_ID_Write(IF_ID_Write)
     );
 
-    always @(posedge clk or posedge reset)
-        PC <= (reset) ? 32'b0 : (PCWrite) ? next_PC : PC;
+wire [31:0] branch_target = IF_ID_PC + imm; // branch target calculated from IF_ID_PC
 
-    assign next_PC = PC + 4;
+assign next_PC = (branch_predict) ? branch_target : (PC + 4);  // combinational logic
+
+always @(posedge clk or posedge reset) begin
+    if (reset)
+        PC <= 32'b0;
+    else if (PCWrite)
+        PC <= next_PC;  // driven by the assign above
+end
+
+
 
     // pipeline register updates as provided earlier in corrected form...
     // IF_ID pipeline register update
 always @(posedge clk) begin
-    if (reset) begin
+    if (reset || flush_IF_ID) begin
         IF_ID_instr <= 32'b0;
-        IF_ID_PC    <= 32'b0;
+        IF_ID_PC <= 32'b0;
+        IF_ID_branch_predict <= 1'b0;
     end else if (IF_ID_Write) begin
         IF_ID_instr <= instr;
-        IF_ID_PC    <= PC;
+        IF_ID_PC <= PC;
+        IF_ID_branch_predict <= branch_predict;
     end
 end
+
 
 // ID_EX pipeline register update (Exactly ONCE)
 always @(posedge clk) begin
-    if (reset || hazard_stall) begin
-        ID_EX_RD1       <= 32'b0;
-        ID_EX_RD2       <= 32'b0;
-        ID_EX_imm       <= 32'b0;
-        ID_EX_rs1       <= 5'b0;
-        ID_EX_rs2       <= 5'b0;
-        ID_EX_rd        <= 5'b0;
-        ID_EX_RegWrite  <= 1'b0;
-        ID_EX_MemRead   <= 1'b0;
-        ID_EX_MemWrite  <= 1'b0;
-        ID_EX_ALUSrc    <= 1'b0;
-        ID_EX_ALUOp     <= 2'b00;
-        ID_EX_MemToReg  <= 1'b0;
-        ID_EX_funct3    <= 3'b000;
-        ID_EX_funct7_bit<= 1'b0;
+    if (reset || hazard_stall || flush_ID_EX) begin
+        ID_EX_RD1            <= 32'b0;
+        ID_EX_RD2            <= 32'b0;
+        ID_EX_imm            <= 32'b0;
+        ID_EX_rs1            <= 5'b0;
+        ID_EX_rs2            <= 5'b0;
+        ID_EX_rd             <= 5'b0;
+        ID_EX_RegWrite       <= 1'b0;
+        ID_EX_MemRead        <= 1'b0;
+        ID_EX_MemWrite       <= 1'b0;
+        ID_EX_ALUSrc         <= 1'b0;
+        ID_EX_ALUOp          <= 2'b00;
+        ID_EX_MemToReg       <= 1'b0;
+        ID_EX_funct3         <= 3'b000;
+        ID_EX_funct7_bit     <= 1'b0;
+        ID_EX_branch_predict <= 1'b0;
+        ID_EX_Branch         <= 1'b0;
     end else begin
-        ID_EX_RD1       <= RD1;
-        ID_EX_RD2       <= RD2;
-        ID_EX_imm       <= imm;
-        ID_EX_rs1       <= rs1;
-        ID_EX_rs2       <= rs2;
-        ID_EX_rd        <= rd;
-        ID_EX_RegWrite  <= RegWrite;
-        ID_EX_MemRead   <= MemRead;
-        ID_EX_MemWrite  <= MemWrite;
-        ID_EX_ALUSrc    <= ALUSrc;
-        ID_EX_ALUOp     <= ALUOp;
-        ID_EX_MemToReg  <= MemToReg;
-        ID_EX_funct3    <= IF_ID_instr[14:12];
-        ID_EX_funct7_bit<= IF_ID_instr[30];
+        ID_EX_RD1            <= RD1;
+        ID_EX_RD2            <= RD2;
+        ID_EX_imm            <= imm;
+        ID_EX_rs1            <= rs1;
+        ID_EX_rs2            <= rs2;
+        ID_EX_rd             <= rd;
+        ID_EX_RegWrite       <= RegWrite;
+        ID_EX_MemRead        <= MemRead;
+        ID_EX_MemWrite       <= MemWrite;
+        ID_EX_ALUSrc         <= ALUSrc;
+        ID_EX_ALUOp          <= ALUOp;
+        ID_EX_MemToReg       <= MemToReg;
+        ID_EX_funct3         <= IF_ID_instr[14:12];
+        ID_EX_funct7_bit     <= IF_ID_instr[30];
+        ID_EX_branch_predict <= IF_ID_branch_predict;
+        ID_EX_Branch         <= Branch;
     end
 end
+
 
 // EX_MEM pipeline register update
 always @(posedge clk) begin
-    if (reset) begin
-        EX_MEM_ALU_result <= 32'b0;
-        EX_MEM_RD2        <= 32'b0;
-        EX_MEM_rd         <= 5'b0;
-        EX_MEM_RegWrite   <= 1'b0;
-        EX_MEM_MemRead    <= 1'b0;
-        EX_MEM_MemWrite   <= 1'b0;
-        EX_MEM_MemToReg   <= 1'b0;
+    if (reset || flush_EX_MEM) begin
+        EX_MEM_ALU_result     <= 32'b0;
+        EX_MEM_RD2            <= 32'b0;
+        EX_MEM_rd             <= 5'b0;
+        EX_MEM_RegWrite       <= 1'b0;
+        EX_MEM_MemRead        <= 1'b0;
+        EX_MEM_MemWrite       <= 1'b0;
+        EX_MEM_MemToReg       <= 1'b0;
+        EX_MEM_branch_taken   <= 1'b0;
+        EX_MEM_Branch         <= 1'b0;
+        EX_MEM_predicted_taken<= 1'b0;
     end else begin
-        EX_MEM_ALU_result <= ALU_result;
-        EX_MEM_RD2        <= ALU_input_B_raw;
-        EX_MEM_rd         <= ID_EX_rd;
-        EX_MEM_RegWrite   <= ID_EX_RegWrite;
-        EX_MEM_MemRead    <= ID_EX_MemRead;
-        EX_MEM_MemWrite   <= ID_EX_MemWrite;
-        EX_MEM_MemToReg   <= ID_EX_MemToReg;
+        EX_MEM_ALU_result     <= ALU_result;
+        EX_MEM_RD2            <= ALU_input_B_raw;
+        EX_MEM_rd             <= ID_EX_rd;
+        EX_MEM_RegWrite       <= ID_EX_RegWrite;
+        EX_MEM_MemRead        <= ID_EX_MemRead;
+        EX_MEM_MemWrite       <= ID_EX_MemWrite;
+        EX_MEM_MemToReg       <= ID_EX_MemToReg;
+        EX_MEM_branch_taken   <= ID_EX_Branch & Zero_flag;
+        EX_MEM_Branch         <= ID_EX_Branch;
+        EX_MEM_predicted_taken<= ID_EX_branch_predict;
     end
 end
 
+
 // MEM_WB pipeline register update
+// MEM/WB pipeline register update
 always @(posedge clk) begin
-    if (reset) begin
+    if (reset || flush_EX_MEM) begin
         MEM_WB_read_data  <= 32'b0;
         MEM_WB_ALU_result <= 32'b0;
         MEM_WB_rd         <= 5'b0;
@@ -228,6 +267,32 @@ always @(posedge clk) begin
         MEM_WB_MemToReg   <= EX_MEM_MemToReg;
     end
 end
+
+ 
+
+branch_prediction_unit BPU (
+    .clk(clk),
+    .reset(reset),
+    .branch_resolved(EX_MEM_Branch), // branch resolved at EX_MEM stage
+    .branch_taken_actual(EX_MEM_branch_taken), // actual branch decision (ALU Zero flag and branch control logic)
+    .branch_predict(branch_predict) // goes to IF stage
+);
+
+
+
+branch_control_flush BCF (
+    .clk(clk),
+    .reset(reset),
+    .branch_taken(EX_MEM_branch_taken),    // final resolved branch decision
+    .predicted_taken(EX_MEM_predicted_taken),  // store earlier prediction at EX_MEM
+    .flush_IF_ID(flush_IF_ID),
+    .flush_ID_EX(flush_ID_EX),
+    .flush_EX_MEM(flush_EX_MEM)
+);
+
+
+
+
 
 
 

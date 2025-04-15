@@ -3,25 +3,29 @@ module instr_mem #(
 )(
     input wire clk,
     input wire reset,
-    input wire [31:0] addr, // Byte address
-    output reg [31:0] instr
+    input wire [31:0] addr,      // Byte address
+    output reg [31:0] instr      // Output instruction
 );
 
-    reg [31:0] memory [0:MEM_DEPTH-1];  // Unified memory
+    reg [31:0] memory [0:MEM_DEPTH-1];  // Unified memory array
 
-    // Load instruction contents only into the first half
+    // Load instructions into first half (IMEM region)
     initial begin
-        $readmemh("instruction_rom_single_dp.txt", memory, 0, (MEM_DEPTH/2)-1);
+        $readmemh("instruction_rom_single_dp.txt", memory, 0, (MEM_DEPTH/2) - 1);
     end
 
     always @(posedge clk or posedge reset) begin
-        if (reset)
-            instr <= 32'h0;
-        else begin
-            if (addr[11:2] < (MEM_DEPTH/2))  // Instruction memory check
-                instr <= memory[addr[11:2]];
-            else
-                instr <= 32'h0; // Invalid instruction fetch
+        if (reset) begin
+            instr <= 32'h00000013; // NOP on reset (ADDI x0, x0, 0)
+        end else begin
+            if (addr[31:2] < (MEM_DEPTH / 2)) begin
+                instr <= memory[addr[31:2]]; // Word-aligned access
+                $display("[IMEM] PC=0x%08h => INSTR=0x%08h", addr, memory[addr[31:2]]);
+            end else begin
+                instr <= 32'h00000013; // NOP on invalid access
+                $display("[IMEM] Invalid PC=0x%08h => NOP inserted", addr);
+            end
         end
     end
+
 endmodule
