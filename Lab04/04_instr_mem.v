@@ -11,7 +11,7 @@ module instr_mem #(
 
     // Load instructions into first half (IMEM region)
     initial begin
-        $readmemh("instruction_rom_single_dp.txt", memory, 0, (MEM_DEPTH/2) - 1);
+        $readmemh("inst_rom.txt", memory, 0, (MEM_DEPTH/2) - 1);
     end
 
     always @(posedge clk or posedge reset) begin
