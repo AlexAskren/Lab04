@@ -76,11 +76,11 @@ module top_pipelined_riscv (
     );
 
     wire [31:0] ALU_input_A = (ForwardA == 2'b10) ? EX_MEM_ALU_result :
-                              (ForwardA == 2'b01) ? (MEM_WB_MemToReg ? MEM_WB_read_data : MEM_WB_ALU_result) :
-                              ID_EX_RD1;
+                          (ForwardA == 2'b01) ? ((MEM_WB_MemToReg == 1'b1) ? MEM_WB_read_data : MEM_WB_ALU_result) :
+                          ID_EX_RD1;
 
     wire [31:0] ALU_input_B_raw = (ForwardB == 2'b10) ? EX_MEM_ALU_result :
-                                  (ForwardB == 2'b01) ? (MEM_WB_MemToReg ? MEM_WB_read_data : MEM_WB_ALU_result) :
+                                  (ForwardB == 2'b01) ? ((MEM_WB_MemToReg == 1'b1) ? MEM_WB_read_data : MEM_WB_ALU_result) :
                                   ID_EX_RD2;
     
     wire [31:0] ALU_input_B = (ID_EX_ALUSrc) ? ID_EX_imm : ALU_input_B_raw;
@@ -179,7 +179,7 @@ end
     // IF_ID pipeline register update
 always @(posedge clk) begin
     if (reset || flush_IF_ID) begin
-        IF_ID_instr <= 32'b0;
+        IF_ID_instr <= 32'h00000013;
         IF_ID_PC <= 32'b0;
         IF_ID_branch_predict <= 1'b0;
     end else if (IF_ID_Write) begin
@@ -209,6 +209,7 @@ always @(posedge clk) begin
         ID_EX_funct7_bit     <= 1'b0;
         ID_EX_branch_predict <= 1'b0;
         ID_EX_Branch         <= 1'b0;
+
     end else begin
         ID_EX_RD1            <= RD1;
         ID_EX_RD2            <= RD2;
