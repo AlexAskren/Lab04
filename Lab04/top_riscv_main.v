@@ -76,12 +76,22 @@ module top_pipelined_riscv (
     );
 
     wire [31:0] ALU_input_A = (ForwardA == 2'b10) ? EX_MEM_ALU_result :
+<<<<<<< HEAD
                           (ForwardA == 2'b01) ? ((MEM_WB_MemToReg == 1'b1) ? MEM_WB_read_data : MEM_WB_ALU_result) :
                           ID_EX_RD1;
 
     wire [31:0] ALU_input_B_raw = (ForwardB == 2'b10) ? EX_MEM_ALU_result :
                                   (ForwardB == 2'b01) ? ((MEM_WB_MemToReg == 1'b1) ? MEM_WB_read_data : MEM_WB_ALU_result) :
                                   ID_EX_RD2;
+=======
+                          (ForwardA == 2'b01) ? MEM_WB_ALU_result :
+                          ID_EX_RD1;
+
+wire [31:0] ALU_input_B_raw = (ForwardB == 2'b10) ? EX_MEM_ALU_result :
+                              (ForwardB == 2'b01) ? MEM_WB_ALU_result :
+                              ID_EX_RD2;
+
+>>>>>>> 1d83ef174731f3dd56e5a49324b21a90cf0e531e
     
     wire [31:0] ALU_input_B = (ID_EX_ALUSrc) ? ID_EX_imm : ALU_input_B_raw;
     
@@ -101,7 +111,7 @@ module top_pipelined_riscv (
         .reset(reset),
         .ALU_ctrl(ALU_ctrl),
         .ALU_ina(ALU_input_A),
-        .ALU_inb_reg(ALU_input_B_raw),
+        .ALU_inb_reg(ALU_input_B),
         .ALU_inb_imm(ID_EX_imm),
         .ALUSrc(ID_EX_ALUSrc),
         .ALU_out(ALU_result),
