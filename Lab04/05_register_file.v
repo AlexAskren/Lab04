@@ -19,7 +19,7 @@ module register_file #(
     reg [REG_DATA_WIDTH-1:0] Register [0:REG_COUNT-1];
     integer i;
 
-    always @(posedge clk) begin
+    always @(*) begin
         if (rst) begin
             for (i = 0; i < REG_COUNT; i = i + 1)
                 Register[i] <= {REG_DATA_WIDTH{1'b0}};
