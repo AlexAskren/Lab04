@@ -10,9 +10,20 @@ module control_unit (
     output reg [1:0]  ALUOp
 );
 
+    // Opcode encoding (RISC-V base)
+    localparam [6:0]
+        OPCODE_R_TYPE = 7'b0110011,
+        OPCODE_I_LOAD = 7'b0000011,
+        OPCODE_S_TYPE = 7'b0100011,
+        OPCODE_B_TYPE = 7'b1100011,
+        OPCODE_I_ALU  = 7'b0010011,
+        OPCODE_JAL    = 7'b1101111,
+        OPCODE_LUI    = 7'b0110111,
+        OPCODE_AUIPC  = 7'b0010111;
+
     always @(*) begin
         if (stall) begin
-            // Insert NOP (No Operation)
+            // NOP
             RegWrite = 0;
             MemRead  = 0;
             MemWrite = 0;
@@ -22,7 +33,7 @@ module control_unit (
             ALUOp    = 2'b00;
         end else begin
             case (opcode)
-                7'b0110011: begin // R-type
+                OPCODE_R_TYPE: begin
                     RegWrite = 1;
                     MemRead  = 0;
                     MemWrite = 0;
@@ -31,7 +42,7 @@ module control_unit (
                     MemToReg = 0;
                     ALUOp    = 2'b10;
                 end
-                7'b0000011: begin // I-type: Load (e.g., lw)
+                OPCODE_I_LOAD: begin
                     RegWrite = 1;
                     MemRead  = 1;
                     MemWrite = 0;
@@ -40,7 +51,7 @@ module control_unit (
                     MemToReg = 1;
                     ALUOp    = 2'b00;
                 end
-                7'b0100011: begin // S-type: Store (e.g., sw)
+                OPCODE_S_TYPE: begin
                     RegWrite = 0;
                     MemRead  = 0;
                     MemWrite = 1;
@@ -49,7 +60,7 @@ module control_unit (
                     MemToReg = 0; // Don't care
                     ALUOp    = 2'b00;
                 end
-                7'b1100011: begin // B-type: Branch (e.g., beq, bne)
+                OPCODE_B_TYPE: begin
                     RegWrite = 0;
                     MemRead  = 0;
                     MemWrite = 0;
@@ -58,7 +69,7 @@ module control_unit (
                     MemToReg = 0; // Don't care
                     ALUOp    = 2'b01;
                 end
-                7'b0010011: begin // I-type: Arithmetic immediate (e.g., addi)
+                OPCODE_I_ALU: begin
                     RegWrite = 1;
                     MemRead  = 0;
                     MemWrite = 0;
@@ -67,7 +78,7 @@ module control_unit (
                     MemToReg = 0;
                     ALUOp    = 2'b10;
                 end
-                7'b1101111: begin // J-type: JAL
+                OPCODE_JAL: begin
                     RegWrite = 1;
                     MemRead  = 0;
                     MemWrite = 0;
@@ -76,16 +87,7 @@ module control_unit (
                     MemToReg = 0;
                     ALUOp    = 2'b00;
                 end
-                7'b0110111: begin // U-type: LUI
-                    RegWrite = 1;
-                    MemRead  = 0;
-                    MemWrite = 0;
-                    ALUSrc   = 1;     // Use immediate
-                    Branch   = 0;
-                    MemToReg = 0;
-                    ALUOp    = 2'b00; // Just pass imm through ALU
-                end
-                7'b0010111: begin // U-type: AUIPC
+                OPCODE_LUI: begin
                     RegWrite = 1;
                     MemRead  = 0;
                     MemWrite = 0;
@@ -94,7 +96,16 @@ module control_unit (
                     MemToReg = 0;
                     ALUOp    = 2'b00;
                 end
-                default: begin // Unknown instruction → NOP
+                OPCODE_AUIPC: begin
+                    RegWrite = 1;
+                    MemRead  = 0;
+                    MemWrite = 0;
+                    ALUSrc   = 1;
+                    Branch   = 0;
+                    MemToReg = 0;
+                    ALUOp    = 2'b00;
+                end
+                default: begin
                     RegWrite = 0;
                     MemRead  = 0;
                     MemWrite = 0;
