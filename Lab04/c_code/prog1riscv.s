@@ -13,6 +13,6 @@ addi t1, t1, 1
 jal zero, loop
 end:
 addi a0, zero, 0
-jalr zero, 0(ra)
+jalr zero, x0, x1
 
 
