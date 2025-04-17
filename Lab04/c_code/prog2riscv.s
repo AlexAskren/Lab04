@@ -60,3 +60,5 @@ bne t2, zero, skip9
 slli t1, t1, 1
 sw t1, 36(t0)
 skip9:
+addi a0, zero, 0
+jalr zero, 0(ra)

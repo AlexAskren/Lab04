@@ -1,8 +1,8 @@
-li t1, 0
+addi t1, zero, 0
 lui t0, 0x10010
 addi t0, t0, 0
 loop:
-li t2, 10
+addi t2, zero, 10
 bge t1, t2, end
 slli t3, t1, 2
 add t4, t0, t3
@@ -12,6 +12,7 @@ sw t5, 0(t4)
 addi t1, t1, 1
 jal zero, loop
 end:
-li a0, 0
-ret
+addi a0, zero, 0
+jalr zero, 0(ra)
+
 
