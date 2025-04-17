@@ -1,13 +1,12 @@
-module hazard_detection_unit #(
-    parameter REG_ADDR_WIDTH = 5  // Default for 32 registers
-)(
-    input  wire                      ID_EX_MemRead,
-    input  wire [REG_ADDR_WIDTH-1:0] ID_EX_Rd,
-    input  wire [REG_ADDR_WIDTH-1:0] IF_ID_Rs1,
-    input  wire [REG_ADDR_WIDTH-1:0] IF_ID_Rs2,
-    output reg                       stall,
-    output reg                       PCWrite,
-    output reg                       IF_ID_Write
+// Updated Hazard Detection Unit with instruction memory support alignment
+module hazard_detection_unit(
+    input wire ID_EX_MemRead,
+    input wire [4:0] ID_EX_Rd,
+    input wire [4:0] IF_ID_Rs1,
+    input wire [4:0] IF_ID_Rs2,
+    output reg stall,
+    output reg PCWrite,
+    output reg IF_ID_Write
 );
 
     always @(*) begin
